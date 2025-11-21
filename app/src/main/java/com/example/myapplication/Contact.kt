@@ -2,17 +2,10 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.ColumnInfo
 
-@Entity(tableName = "contacts")
+@Entity(tableName = "contact")
 data class Contact(
-    @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
-
-    @ColumnInfo(name = "name")
+    @PrimaryKey(autoGenerate = true) val id: Int=0,
     val name: String,
-
-    @ColumnInfo(name = "phone")
     val phone: String,
-
-    @ColumnInfo(name = "category")
-    val category: String
+    val category: String,
 )

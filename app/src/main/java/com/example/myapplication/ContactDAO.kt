@@ -1,19 +1,22 @@
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface ContactDao {
-
     @Insert
-    suspend fun insertContact(contact: Contact)
+    suspend fun insert(contact: Contact)
 
-    @Query("SELECT * FROM contacts")
+    @Update
+    suspend fun update(contact: Contact)
+
+    @Delete
+    suspend fun delete(contact: Contact)
+
+    @Query("SELECT * FROM contact")
     suspend fun getAllContacts(): List<Contact>
 
-    @Query("SELECT * FROM contacts WHERE category = :categoryInput")
-    suspend fun getContactsByCategory(categoryInput: String): List<Contact>
 
-    @Query("SELECT DISTINCT category FROM contacts")
-    suspend fun getAllCategories(): List<String>
 }

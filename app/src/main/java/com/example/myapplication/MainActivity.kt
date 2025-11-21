@@ -1,99 +1,134 @@
 package com.example.myapplication
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var db: AppDatabase
+    private lateinit var contactDao: ContactDao
+    private lateinit var contactsAdapter: ContactAdapter
+    private var allContacts = emptyList<ContactEntity>()
+
+    private lateinit var nameEditText: EditText
+    private lateinit var phoneEditText: EditText
+    private lateinit var categoryEditText: EditText
+    private lateinit var saveButton: Button
+    private lateinit var categorySpinner: Spinner
+    private lateinit var filterButton: Button
+    private lateinit var showAllButton: Button
+    private lateinit var contactsListView: ListView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyApplicationTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    nameTextField()
-                }
+        setContentView(R.layout.activity_main)
+
+        db = AppDatabase.getDatabase(this)
+        contactDao = db.contactDao()
+
+        nameEditText = findViewById(R.id.edit_text_name)
+        phoneEditText = findViewById(R.id.edit_text_phone)
+        categoryEditText = findViewById(R.id.edit_text_category)
+        saveButton = findViewById(R.id.button_save)
+        categorySpinner = findViewById(R.id.spinner_category)
+        filterButton = findViewById(R.id.button_filter)
+        showAllButton = findViewById(R.id.button_show_all)
+        contactsListView = findViewById(R.id.list_view_contacts)
+
+        contactsAdapter = ContactAdapter(this, allContacts)
+        contactsListView.adapter = contactsAdapter
+
+        contactDao.getAllContacts().observe(this, Observer { contacts ->
+            allContacts = contacts
+            updateListView(allContacts)
+            updateCategorySpinner()
+        })
+
+        saveButton.setOnClickListener {
+            saveContact()
+        }
+
+        filterButton.setOnClickListener {
+            filterContacts()
+        }
+
+        showAllButton.setOnClickListener {
+            updateListView(allContacts)
+        }
+
+        contactsListView.setOnItemClickListener { _, _, position, _ ->
+            val selectedContact = contactsAdapter.getItem(position)
+            openDialer(selectedContact?.phone)
+        }
+    }
+
+    private fun saveContact() {
+        val name = nameEditText.text.toString().trim()
+        val phone = phoneEditText.text.toString().trim()
+        val category = categoryEditText.text.toString().trim()
+
+        if (name.isEmpty() || phone.isEmpty() || category.isEmpty()) {
+            Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val contact = ContactEntity(name = name, phone = phone, category = category)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            contactDao.insertContact(contact)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Contact Saved!", Toast.LENGTH_SHORT).show()
+                nameEditText.text.clear()
+                phoneEditText.text.clear()
+                categoryEditText.text.clear()
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    private fun updateListView(contacts: List<ContactEntity>) {
+        contactsAdapter = ContactAdapter(this, contacts)
+        contactsListView.adapter = contactsAdapter
+    }
 
-@Composable
-fun showCol() {
+    private fun updateCategorySpinner() {
+        contactDao.getAllCategories().observe(this, Observer { categories ->
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            categorySpinner.adapter = adapter
+        })
+    }
 
-}
+    private fun filterContacts() {
+        if (categorySpinner.selectedItem != null) {
+            val selectedCategory = categorySpinner.selectedItem.toString()
 
+            contactDao.getContactsByCategory(selectedCategory).observe(this, Observer { filteredContacts ->
+                updateListView(filteredContacts)
+            })
+        } else {
+            Toast.makeText(this, "No category selected", Toast.LENGTH_SHORT).show()
+        }
+    }
 
-@Composable
-fun nameTextField() {
-    var name by remember { mutableStateOf(value = "") }
-    TextField(
-        value = name,
-        onValueChange = { name = it },
-        label = { Text(text = "Contact Name") },
-        placeholder = { Text(text = "name") },
-        modifier = Modifier.fillMaxWidth().padding(all = 40.dp)
-    )
-}
+    private fun openDialer(phoneNumber: String?) {
+        if (phoneNumber.isNullOrEmpty()) return
 
-@Composable
-fun phoneTextField() {
-    var phonenum by remember { mutableStateOf(value = "") }
-    TextField(
-        value = phonenum,
-        onValueChange = { phonenum = it },
-        label = { Text(text = "Phone Number") },
-        placeholder = { Text(text = "01000000000") },
-        modifier = Modifier.fillMaxWidth().padding(all = 40.dp)
-    )
-}
+        val intent = Intent(Intent.ACTION_DIAL).apply {
+            data = Uri.parse("tel:$phoneNumber")
+        }
 
-@Composable
-fun categoryTextField() {
-    var category by remember { mutableStateOf(value = "") }
-    TextField(
-        value = category,
-        onValueChange = { category = it },
-        label = { Text(text = "Category") },
-        placeholder = { Text(text = "name") },
-        modifier = Modifier.fillMaxWidth().padding(all = 40.dp)
-    )
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewNameTextField() {
-    MyApplicationTheme {
-        nameTextField()
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "No dialer app found.", Toast.LENGTH_SHORT).show()
+        }
     }
 }
-
